@@ -28,6 +28,7 @@
  * lint - style defines to help syntax parsers with sdcc-specific 8051 code
  * They don't interfere with actual compilation
  */
+#ifndef IAR_FOR_2530 //与iar冲突
 #if !defined(__SDCC_mcs51) && !defined(SDCC_mcs51)
 #define __data
 #define __xdata
@@ -40,6 +41,7 @@
 #define __using(x)
 #define __interrupt(x)
 #define __naked
+#endif
 #endif
 
 #define CC_CONF_FUNCTION_POINTER_ARGS	1

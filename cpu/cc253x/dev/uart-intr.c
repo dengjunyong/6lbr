@@ -37,8 +37,13 @@ uart0_set_input(int (* input)(unsigned char c))
 #if CC_CONF_OPTIMIZE_STACK_SIZE
 #pragma exclude bits
 #endif
+#ifdef IAR_FOR_2530
+  #pragma vector=URX0_VECTOR
+  __near_func __interrupt void uart0_rx_isr(void)
+#else
 void
 uart0_rx_isr(void) __interrupt(URX0_VECTOR)
+#endif
 {
   ENERGEST_ON(ENERGEST_TYPE_IRQ);
   URX0IF = 0;
@@ -58,14 +63,20 @@ uart1_set_input(int (* input)(unsigned char c))
   uart1_input_handler = input;
 }
 /*---------------------------------------------------------------------------*/
-#if UART_ONE_CONF_WITH_INPUT
+//#if UART_ONE_CONF_WITH_INPUT
+#if UART1_CONF_WITH_INPUT
 /* avoid referencing bits since we're not using them */
 #pragma save
 #if CC_CONF_OPTIMIZE_STACK_SIZE
 #pragma exclude bits
 #endif
+#ifdef IAR_FOR_2530
+  #pragma vector=URX1_VECTOR
+  __near_func __interrupt void uart1_rx_isr(void)
+#else
 void
 uart1_rx_isr(void) __interrupt(URX1_VECTOR)
+#endif
 {
   ENERGEST_ON(ENERGEST_TYPE_IRQ);
   URX1IF = 0;

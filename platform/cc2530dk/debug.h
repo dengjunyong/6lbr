@@ -46,7 +46,7 @@
 #include "8051def.h"
 #include "dev/uart1.h"
 
-void putchar(char c);
+void putchar(char c); //iar 编译器stdio.h 定义了int putchar(int), 需要把它注释掉
 void putstring(char *s);
 void puthex(uint8_t c);
 void putbin(uint8_t c);

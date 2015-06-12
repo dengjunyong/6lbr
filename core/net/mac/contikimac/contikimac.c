@@ -66,7 +66,8 @@
 #ifdef CONTIKIMAC_CONF_WITH_CONTIKIMAC_HEADER
 #define WITH_CONTIKIMAC_HEADER       CONTIKIMAC_CONF_WITH_CONTIKIMAC_HEADER
 #else
-#define WITH_CONTIKIMAC_HEADER       1
+//#define WITH_CONTIKIMAC_HEADER       1
+#define WITH_CONTIKIMAC_HEADER       0
 #endif
 /* More aggressive radio sleeping when channel is busy with other traffic */
 #ifndef WITH_FAST_SLEEP
@@ -222,7 +223,7 @@ static int we_are_receiving_burst = 0;
 #ifdef CONTIKIMAC_CONF_SHORTEST_PACKET_SIZE
 #define SHORTEST_PACKET_SIZE  CONTIKIMAC_CONF_SHORTEST_PACKET_SIZE
 #else
-#define SHORTEST_PACKET_SIZE               43
+#define SHORTEST_PACKET_SIZE               10
 #endif
 
 
@@ -233,12 +234,17 @@ static struct rtimer rt;
 static struct pt pt;
 
 static volatile uint8_t contikimac_is_on = 0;
+#if KEEP_RADIO_ON
+static volatile uint8_t contikimac_keep_radio_on = 1;
+#else
 static volatile uint8_t contikimac_keep_radio_on = 0;
+#endif
 
 static volatile unsigned char we_are_sending = 0;
 static volatile unsigned char radio_is_on = 0;
 
 #define DEBUG 0
+//#define DEBUG DEBUG_FLAG
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -1024,7 +1030,11 @@ turn_on(void)
 {
   if(contikimac_is_on == 0) {
     contikimac_is_on = 1;
+#if KEEP_RADIO_ON
+    contikimac_keep_radio_on = 1;
+#else
     contikimac_keep_radio_on = 0;
+#endif
     rtimer_set(&rt, RTIMER_NOW() + CYCLE_TIME, 1,
                (void (*)(struct rtimer *, void *))powercycle, NULL);
   }

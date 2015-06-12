@@ -44,15 +44,15 @@
 
 
 /* Define which resources to include to meet memory constraints. */
-#define REST_RES_HELLO 0
+#define REST_RES_HELLO 1
 #define REST_RES_CHUNKS 0
 #define REST_RES_SEPARATE 0
 #define REST_RES_PUSHING 0
 #define REST_RES_EVENT 0
 #define REST_RES_SUB 0
-#define REST_RES_LEDS 1
+#define REST_RES_LEDS 0
 #define REST_RES_TOGGLE 0
-#define REST_RES_LIGHT 1
+#define REST_RES_LIGHT 0
 #define REST_RES_BATTERY 0
 #define REST_RES_RADIO 0
 #define REST_RES_MIRROR 0 /* causes largest code size */

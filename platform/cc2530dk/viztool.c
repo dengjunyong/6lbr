@@ -271,13 +271,17 @@ PROCESS_THREAD(viztool_process, ev, data)
 
   PROCESS_BEGIN();
 
+#if UIP_CONF_UDP
   server_conn = udp_new(NULL, UIP_HTONS(0), NULL);
   udp_bind(server_conn, UIP_HTONS(VIZTOOL_UDP_PORT));
+#endif
 
   while(1) {
     PROCESS_YIELD();
     if(ev == tcpip_event) {
+#if UIP_CONF_UDP
       tcpip_handler();
+#endif
     }
   }
 

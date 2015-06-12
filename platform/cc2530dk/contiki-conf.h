@@ -50,9 +50,7 @@
  *   SmartRF RS232 -> USART0 / Alternative 1 (UART)
  *   SmartRF LCD   -> USART1 / Alternative 2 (SPI)
  */
-#define UART_ON_USART     0
-
-#define UART1_CONF_ENABLE 0
+#define UART_ON_USART     0 //代码中未使用
 
 #ifndef UART0_CONF_ENABLE
 #define UART0_CONF_ENABLE  1
@@ -65,13 +63,25 @@
 #define UART0_CONF_HIGH_SPEED 0
 #endif
 
+#ifndef UART1_CONF_ENABLE
+#define UART1_CONF_ENABLE 0
+#endif
+#ifndef UART1_CONF_WITH_INPUT
+#define UART1_CONF_WITH_INPUT 0
+#endif
+
+#ifndef UART1_CONF_HIGH_SPEED
+#define UART1_CONF_HIGH_SPEED 0
+#endif
+
 /* USB output buffering enabled by default (relevant to cc2531 builds only) */
 #ifndef USB_SERIAL_CONF_BUFFERED
-#define USB_SERIAL_CONF_BUFFERED 1
+#define USB_SERIAL_CONF_BUFFERED 0
 #endif
 
 #define SLIP_RADIO_CONF_NO_PUTCHAR 1
 
+//examples/ipv6/slip-radio 中 #define CMD_CONF_OUTPUT border_router_cmd_output
 #if defined (UIP_FALLBACK_INTERFACE) || defined (CMD_CONF_OUTPUT)
 #define SLIP_ARCH_CONF_ENABLE      1
 #endif
@@ -79,10 +89,10 @@
 /* Are we a SLIP bridge? */
 #if SLIP_ARCH_CONF_ENABLE
 /* Make sure the UART is enabled, with interrupts */
-#undef UART0_CONF_ENABLE
-#undef UART0_CONF_WITH_INPUT
-#define UART0_CONF_ENABLE  1
-#define UART0_CONF_WITH_INPUT 1
+#undef UART1_CONF_ENABLE
+#undef UART1_CONF_WITH_INPUT
+#define UART1_CONF_ENABLE  1 // slip-radio使用了串口1
+#define UART1_CONF_WITH_INPUT 1
 #endif
 
 /* Output all captured frames over the UART in hexdump format */
@@ -92,7 +102,7 @@
 
 #if CC2530_RF_CONF_HEXDUMP
 /* We need UART1 output */
-#undef UART_ZERO_CONF_ENABLE
+#undef UART_ZERO_CONF_ENABLE //这种写法在cpu/cc2440使用, cpu/cc253x中用UART0_这种写法
 #define UART_ZERO_CONF_ENABLE   1
 #endif
 
@@ -130,7 +140,7 @@
  * even if the sensor is not present on our device
  */
 #ifndef BUTTON_SENSOR_CONF_ON
-#define BUTTON_SENSOR_CONF_ON   1  /* Buttons */
+#define BUTTON_SENSOR_CONF_ON   0  /* Buttons */
 #endif
 
 /* B2 on the cc2531 USB stick can be a reset button or a general-purpose one */
@@ -140,10 +150,10 @@
 
 /* ADC - Turning this off will disable everything below */
 #ifndef ADC_SENSOR_CONF_ON
-#define ADC_SENSOR_CONF_ON      1
+#define ADC_SENSOR_CONF_ON      0
 #endif
-#define TEMP_SENSOR_CONF_ON     1  /* Temperature */
-#define VDD_SENSOR_CONF_ON      1  /* Supply Voltage */
+#define TEMP_SENSOR_CONF_ON     0  /* Temperature */
+#define VDD_SENSOR_CONF_ON      0  /* Supply Voltage */
 #define BATTERY_SENSOR_CONF_ON  0  /* Battery */
 
 /* Low Power Modes - We only support PM0/Idle and PM1 */
@@ -193,10 +203,12 @@
 #define NETSTACK_CONF_RADIO   cc2530_rf_driver
 
 /* RF Config */
+#ifndef IEEE802154_CONF_PANID
 #define IEEE802154_CONF_PANID 0x5449 /* TI */
+#endif
 
 #ifndef CC2530_RF_CONF_CHANNEL
-#define CC2530_RF_CONF_CHANNEL    25
+#define CC2530_RF_CONF_CHANNEL    26
 #endif /* CC2530_RF_CONF_CHANNEL */
 
 #ifndef CC2530_RF_CONF_AUTOACK
@@ -212,8 +224,12 @@
 #define UIP_CONF_NETIF_MAX_ADDRESSES         3
 
 /* TCP, UDP, ICMP */
+#ifndef UIP_CONF_TCP
 #define UIP_CONF_TCP                         0
+#endif
+#ifndef UIP_CONF_UDP
 #define UIP_CONF_UDP                         1
+#endif
 #define UIP_CONF_UDP_CHECKSUMS               1
 
 /* ND and Routing */
@@ -222,7 +238,7 @@
 #endif
 
 #define UIP_CONF_ND6_SEND_RA                 0
-#define UIP_CONF_IP_FORWARD                  0
+#define UIP_CONF_IP_FORWARD                  0 //for ipv4 forward
 #define RPL_CONF_STATS                       0
 #define RPL_CONF_MAX_DAG_ENTRIES             1
 #ifndef RPL_CONF_OF
@@ -241,10 +257,14 @@
 
 /* uIP */
 #ifndef UIP_CONF_BUFFER_SIZE
-#define UIP_CONF_BUFFER_SIZE               240
+#define UIP_CONF_BUFFER_SIZE               512
 #endif
 #define UIP_CONF_IPV6_QUEUE_PKT              0
+
+#ifndef UIP_CONF_IPV6_CHECKS
 #define UIP_CONF_IPV6_CHECKS                 1
+#endif
+
 #define UIP_CONF_IPV6_REASSEMBLY             0
 
 /* 6lowpan */

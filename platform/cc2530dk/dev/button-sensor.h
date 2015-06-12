@@ -76,7 +76,13 @@ extern const struct sensors_sensor button_2_sensor;
 #if MODELS_CONF_CC2531_USB_STICK
 /* USB Dongle */
 /* Buttons: P1_2 & P1_3 - Port 1 ISR needed */
+#ifdef IAR_FOR_2530
+  #pragma vector=P1INT_VECTOR
+  __near_func __interrupt void port_1_isr(void)
+#else
 void port_1_isr(void) __interrupt(P1INT_VECTOR);
+#endif
+
 #define   BUTTON_SENSOR_ACTIVATE() do { \
     button_1_sensor.configure(SENSORS_ACTIVE, 1); \
     button_2_sensor.configure(SENSORS_ACTIVE, 1); \
@@ -85,7 +91,13 @@ void port_1_isr(void) __interrupt(P1INT_VECTOR);
 #else /* MODELS_CONF_CC2531_USB_STICK */
 /* SmartRF */
 /* Button 1: P0_1 - Port 0 ISR needed */
+#ifdef IAR_FOR_2530
+  #pragma vector=P0INT_VECTOR
+  __near_func __interrupt void port_0_isr(void)
+#else
 void port_0_isr(void) __interrupt(P0INT_VECTOR);
+#endif
+
 #define   BUTTON_SENSOR_ACTIVATE() button_sensor.configure(SENSORS_ACTIVE, 1)
 #endif /* MODELS_CONF_CC2531_USB_STICK */
 

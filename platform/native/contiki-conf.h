@@ -130,7 +130,8 @@ typedef unsigned int uip_stats_t;
 
 /* configure number of neighbors and routes */
 #ifndef NBR_TABLE_CONF_MAX_NEIGHBORS
-#define NBR_TABLE_CONF_MAX_NEIGHBORS     30
+//#define NBR_TABLE_CONF_MAX_NEIGHBORS     30
+#define NBR_TABLE_CONF_MAX_NEIGHBORS     200
 #endif /* NBR_TABLE_CONF_MAX_NEIGHBORS */
 #ifndef UIP_CONF_MAX_ROUTES
 #define UIP_CONF_MAX_ROUTES   30

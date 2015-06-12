@@ -48,6 +48,7 @@
 #if UIP_CONF_IPV6
 
 #define DEBUG DEBUG_NONE
+//#define DEBUG DEBUG_FLAG
 #include "net/ip/uip-debug.h"
 
 /*---------------------------------------------------------------------------*/
@@ -208,9 +209,16 @@ set_dao_lifetime_timer(rpl_instance_t *instance)
      time has been configured */
   if(instance->lifetime_unit != 0xffff && instance->default_lifetime != 0xff) {
     clock_time_t expiration_time;
+#ifdef IAR_FOR_2530 //不这样改的话, expiration_time永远=0,死循环
+    unsigned long tmp = (unsigned long)instance->default_lifetime *
+      (clock_time_t)instance->lifetime_unit *
+      CLOCK_SECOND / 2;
+    expiration_time = tmp > (unsigned long)0xFFFF? 0xFFFF : tmp;
+#else
     expiration_time = (clock_time_t)instance->default_lifetime *
       (clock_time_t)instance->lifetime_unit *
       CLOCK_SECOND / 2;
+#endif
     PRINTF("RPL: Scheduling DAO lifetime timer %u ticks in the future\n",
            (unsigned)expiration_time);
     ctimer_set(&instance->dao_lifetime_timer, expiration_time,
@@ -291,7 +299,8 @@ schedule_dao(rpl_instance_t *instance, clock_time_t latency)
     PRINTF("RPL: DAO timer already scheduled\n");
   } else {
     if(latency != 0) {
-      expiration_time = latency / 2 +
+      //expiration_time = latency / 2 +
+      expiration_time = 2 + // between 2 to 2+latecy
         (random_rand() % (latency));
     } else {
       expiration_time = 0;

@@ -37,8 +37,13 @@ extern void spi_rx_dma_callback(void);
 #if CC_CONF_OPTIMIZE_STACK_SIZE
 #pragma exclude bits
 #endif
+#ifdef IAR_FOR_2530
+  #pragma vector=DMA_VECTOR
+  __near_func __interrupt void dma_isr(void)
+#else
 void
 dma_isr(void) __interrupt(DMA_VECTOR)
+#endif
 {
 #if DMA_ON
   uint8_t i;

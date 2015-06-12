@@ -52,7 +52,11 @@ volatile uint8_t sleep_flag;
 #endif
 /*---------------------------------------------------------------------------*/
 /* Do NOT remove the absolute address and do NOT remove the initialiser here */
+#ifdef IAR_FOR_2530
+static volatile unsigned long timer_value = 0;
+#else
 __xdata __at(0x0000) static unsigned long timer_value = 0;
+#endif
 
 static volatile CC_AT_DATA clock_time_t count = 0; /* Uptime in ticks */
 static volatile CC_AT_DATA clock_time_t seconds = 0; /* Uptime in secs */
@@ -136,8 +140,13 @@ clock_init(void)
 #if CC_CONF_OPTIMIZE_STACK_SIZE
 #pragma exclude bits
 #endif
+#ifdef IAR_FOR_2530
+  #pragma vector=ST_VECTOR
+  __near_func __interrupt void clock_isr(void)
+#else
 void
 clock_isr(void) __interrupt(ST_VECTOR)
+#endif
 {
   DISABLE_INTERRUPTS();
   ENERGEST_ON(ENERGEST_TYPE_IRQ);

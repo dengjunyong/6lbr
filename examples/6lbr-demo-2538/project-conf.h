@@ -47,13 +47,13 @@
 #define UIP_CONF_IPV6_RPL 1
 
 #undef RPL_CONF_LEAF_ONLY
-#define RPL_CONF_LEAF_ONLY 1 //rpl叶子节点
+//#define RPL_CONF_LEAF_ONLY 1 //rpl叶子节点
 
 #undef UIP_CONF_UDP
 #define UIP_CONF_UDP 1
 
 #undef WITH_COAP
-#define WITH_COAP 13
+//#define WITH_COAP 13
 
 #undef REST
 #define REST coap_rest_implementation
@@ -306,7 +306,7 @@
 #define NEIGHBOR_CONF_MAX_NEIGHBORS     24 //代码中不再使用,代替它的是NBR_TABLE_CONF_MAX_NEIGHBORS
 
 #undef NBR_TABLE_CONF_MAX_NEIGHBORS
-#define NBR_TABLE_CONF_MAX_NEIGHBORS    1 /* 最大邻居个数 */
+#define NBR_TABLE_CONF_MAX_NEIGHBORS    50 /* 最大邻居个数 */
 
 #undef UIP_CONF_DS6_NBR_NBU
 #define UIP_CONF_DS6_NBR_NBU     24 //代码中没有使用
@@ -316,7 +316,7 @@
 #define UIP_CONF_DS6_ROUTE_NBU   24
 
 #undef UIP_CONF_MAX_ROUTES
-#define UIP_CONF_MAX_ROUTES   1 //最大路由个数,叶子节点路由个数可以为0,但是数组大小不能为0
+#define UIP_CONF_MAX_ROUTES   50 //最大路由个数,叶子节点路由个数可以为0,但是数组大小不能为0
 
 #undef UIP_CONF_ND6_SEND_NA
 #define UIP_CONF_ND6_SEND_NA   1

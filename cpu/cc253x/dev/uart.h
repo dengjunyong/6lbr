@@ -33,6 +33,12 @@
 /* 115200 */
 #define UART_115_M   216
 #define UART_115_E    11
+/* 76800 */
+#define UART_768_M    59
+#define UART_768_E    11
+/* 57600 */
+#define UART_576_M   216
+#define UART_576_E    10
 /* 38400 */
 #define UART_38_M     59
 #define UART_38_E     10

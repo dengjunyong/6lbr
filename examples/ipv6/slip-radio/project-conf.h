@@ -30,6 +30,78 @@
 #ifndef PROJECT_CONF_H_
 #define PROJECT_CONF_H_
 
+/*---------------------------------------------------------------------------*/
+/* DIY ( iar can not read Makefile )                                         */
+/*---------------------------------------------------------------------------*/
+#undef UIP_CONF_IPV6
+#define UIP_CONF_IPV6 1
+
+#undef UIP_CONF_IPV6_RPL
+#define UIP_CONF_IPV6_RPL 1
+
+#undef RPL_CONF_LEAF_ONLY
+#define RPL_CONF_LEAF_ONLY 1 //rpl叶子节点
+
+#undef UIP_CONF_UDP
+#define UIP_CONF_UDP 1
+
+#undef WITH_COAP
+#define WITH_COAP 13
+
+#undef REST
+#define REST coap_rest_implementation
+
+#undef UIP_CONF_TCP
+#define UIP_CONF_TCP 0
+
+#undef UIP_CONF_ICMP6
+#define UIP_CONF_ICMP6 0
+
+#undef SICSLOWPAN_CONF_FRAG
+#define SICSLOWPAN_CONF_FRAG 1
+
+#undef UIP_CONF_IPV6_CHECKS
+#define UIP_CONF_IPV6_CHECKS 1
+
+//#define NULLRDC_CONF_ACK_WAIT_TIME (RTIMER_SECOND / 100)
+
+#define KEEP_RADIO_ON 1 // contikimac 用到
+
+//#define RFX2401C_ON 1 // PA
+
+#define RPL_CONF_DAO_LATENCY 512 //dao回复时间范围,避免碰撞的机制
+
+/*
+ * csma重发时间1/NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE,
+ * rdc层contikimac也用到该值,在csma重发时间段内无限重发
+ */
+#define NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE 8
+
+#define UART1_PRIORITY_HIGH 1 //串口1优先级调到最高
+
+#define DEBUG_FLAG 0 /* debug flag */
+#define STARTUP_CONF_VERBOSE 0
+
+#undef RF_CHANNEL
+#define RF_CHANNEL 26
+
+#undef WITH_DTLS_COAP
+#define WITH_DTLS_COAP 0
+
+#undef AUTOSTART_ENABLE
+#define AUTOSTART_ENABLE 1
+
+#undef UART0_CONF_ENABLE
+#define UART0_CONF_ENABLE 0
+#undef UART0_CONF_WITH_INPUT
+#define UART0_CONF_WITH_INPUT 0
+#undef UART1_CONF_ENABLE
+#define UART1_CONF_ENABLE 1 // usb dongle 用串口1
+#undef UART1_CONF_WITH_INPUT
+#define UART1_CONF_WITH_INPUT 1
+
+/*--------------------------------------------------------------------------*/
+
 #undef QUEUEBUF_CONF_NUM
 #define QUEUEBUF_CONF_NUM          4
 

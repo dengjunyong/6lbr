@@ -81,12 +81,21 @@ fade(int l) CC_NON_BANKED
 static void
 set_rime_addr(void) CC_NON_BANKED
 {
-  char i;
-
+  //char i; //不能使用char,iar认为char是无符号的,永远>=0,死循环
+  int8_t i;
+ 
 #if CC2530_CONF_MAC_FROM_PRIMARY
+#ifdef IAR_FOR_2530
+  volatile unsigned char * macp = &X_IEEE_ADDR;
+#else
   __xdata unsigned char *macp = &X_IEEE_ADDR;
+#endif
+#else
+#ifdef IAR_FOR_2530
+  volatile unsigned char * macp = (__code unsigned char *) 0xFFE8;
 #else
   __code unsigned char *macp = (__code unsigned char *)0xFFE8;
+#endif
 #endif
 
   PUTSTRING("Rime is 0x");
@@ -258,7 +267,7 @@ main(void) CC_NON_BANKED
 
   autostart_start(autostart_processes);
 
-  watchdog_start();
+  // watchdog_start();  @@zhy
 
   fade(LEDS_YELLOW);
 

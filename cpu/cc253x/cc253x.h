@@ -47,6 +47,20 @@
 
 /*---------------------------------------------------------------------------*/
 /* Compiler Abstraction */
+#ifdef IAR_FOR_2530
+#if (chip == 2531)
+  #include "ioCC2531.h"
+#else
+  #include "ioCC2530.h"
+#endif
+
+#define X_IEEE_ADDR (*(uint8_t*)(P_INFOPAGE + 0x0C))
+#define OVFIM T1OVFIM
+
+#elif define IAR_FOR_2538
+  #include "ioCC2538.h"
+
+#else
 #include <compiler.h>
 /*---------------------------------------------------------------------------
  * Interrupt Vectors
@@ -669,5 +683,6 @@ SFRX(X_P2DIR,     0x70FF); /* Port 2 direction */
  *---------------------------------------------------------------------------*/
 SFRX(X_INFOPAGE,  0x7800); /* Start of Information Page */
 SFRX(X_IEEE_ADDR, 0x780C); /* Start of unique IEEE Address */
+#endif /* IAR_FOR_2530 */
 
 #endif /* CC253X_H_ */

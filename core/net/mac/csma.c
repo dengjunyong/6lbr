@@ -56,6 +56,7 @@
 #include <stdio.h>
 
 #define DEBUG 0
+//#define DEBUG DEBUG_FLAG
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -485,5 +486,46 @@ const struct mac_driver csma_driver = {
   on,
   off,
   channel_check_interval,
+};
+/*---------------------------------------------------------------------------*/
+static void
+test_init(void)
+{
+    return;
+}
+static void
+test_send(mac_callback_t sent_callback, void *ptr)
+{
+    return;
+}
+static void
+test_input(void)
+{
+    return;
+}
+static int
+test_on(void)
+{
+    return 0;
+}
+static int
+test_off(int keep_radio_on)
+{
+    return 0;
+}
+unsigned short
+test_channel_check_interval(void)
+{
+    return 0;
+}
+
+const struct mac_driver mac_test_driver = {
+  "MAC_TEST",
+  test_init,
+  test_send,
+  test_input,
+  test_on,
+  test_off,
+  test_channel_check_interval,
 };
 /*---------------------------------------------------------------------------*/

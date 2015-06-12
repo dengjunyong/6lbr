@@ -264,12 +264,20 @@ static int last_rssi;
 /*-------------------------------------------------------------------------*/
 static struct rime_sniffer *callback = NULL;
 
+#if IAR_FOR_2530
+//增加static， 防止iar编译时和rime.h冲突重定义
+static
+#endif
 void
 rime_sniffer_add(struct rime_sniffer *s)
 {
   callback = s;
 }
 
+#if IAR_FOR_2530
+//增加static， 防止iar编译时和rime.h冲突重定义
+static
+#endif
 void
 rime_sniffer_remove(struct rime_sniffer *s)
 {

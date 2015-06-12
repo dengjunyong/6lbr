@@ -38,8 +38,14 @@ extern struct cc253x_p2_handler *handlers;
 #if CC_CONF_OPTIMIZE_STACK_SIZE
 #pragma exclude bits
 #endif
+
+#ifdef IAR_FOR_2530
+  #pragma vector=P2INT_VECTOR
+  __near_func __interrupt void port_2_isr(void)
+#else
 void
 port_2_isr(void) __interrupt(P2INT_VECTOR)
+#endif
 {
   struct cc253x_p2_handler *h;
   uint8_t handled = 0;

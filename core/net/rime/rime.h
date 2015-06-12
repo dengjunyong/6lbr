@@ -97,8 +97,13 @@ struct rime_sniffer {
 #define RIME_SNIFFER(name, input_callback, output_callback) \
 static struct rime_sniffer name = { NULL, input_callback, output_callback }
 
+#ifdef IAR_FOR_2530
+static void rime_sniffer_add(struct rime_sniffer *s);
+static void rime_sniffer_remove(struct rime_sniffer *s);
+#else
 void rime_sniffer_add(struct rime_sniffer *s);
 void rime_sniffer_remove(struct rime_sniffer *s);
+#endif
 
 extern const struct network_driver rime_driver;
 

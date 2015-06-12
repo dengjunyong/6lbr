@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "cc253x.h"
+#include "sfr-bits.h"
 #include "dev/uart1.h"
 
 #if UART1_ENABLE
@@ -45,7 +46,10 @@ uart1_init()
 #if UART_ONE_CONF_HIGH_SPEED
   UART_SET_SPEED(1, UART_460_M, UART_460_E);
 #else
-  UART_SET_SPEED(1, UART_115_M, UART_115_E);
+  //UART_SET_SPEED(1, UART_115_M, UART_115_E);
+  //UART_SET_SPEED(1, UART_768_M, UART_768_E);
+  UART_SET_SPEED(1, UART_576_M, UART_576_E);
+  //UART_SET_SPEED(1, UART_38_M, UART_38_E);
 #endif
 
 #ifdef UART1_RTSCTS
@@ -57,8 +61,13 @@ uart1_init()
   U1CSR = UCSR_MODE; /* UART mode */
   U1UCR |= 0x80; /* Flush */
 
+  UART1_RX_EN(); //当1 写入UxCSR.RE 位时，在UART 上数据接收就开始了
   UART1_RX_INT(1);
   U0DBUF = 0;
+#if UART1_PRIORITY_HIGH
+  IP0 |= 0x08;
+  IP1 |= 0x08;
+#endif
 }
 /*---------------------------------------------------------------------------*/
 /* Write one byte over the UART. */

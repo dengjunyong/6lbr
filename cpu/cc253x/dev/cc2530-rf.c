@@ -73,6 +73,7 @@
 #endif
 /*---------------------------------------------------------------------------*/
 #define DEBUG 0
+//#define DEBUG DEBUG_FLAG
 #if DEBUG
 #include "debug.h"
 #define PUTSTRING(...) putstring(__VA_ARGS__)
@@ -212,6 +213,12 @@ init(void)
 
   rf_flags |= RF_ON;
 
+#ifdef RFX2401C_ON
+  P1    &= ~ ( 0x04 | 0x08 );  // set output low
+  P1SEL &= ~ ( 0x04 | 0x08 );    // set gpio
+  P1DIR |= ( 0x04 | 0x08 );    // output
+  P1    |= 0x08; //set rfx2401c RXEN (CE)
+#endif
   return 1;
 }
 /*---------------------------------------------------------------------------*/
@@ -286,6 +293,11 @@ transmit(unsigned short transmit_len)
   ENERGEST_OFF(ENERGEST_TYPE_LISTEN);
   ENERGEST_ON(ENERGEST_TYPE_TRANSMIT);
 
+  #ifdef RFX2401C_ON
+  P1 |= 0x04; //set rfx2401c TXEN ON
+  P1 |= 0x08; //set rfx2401c RXEN (CE)
+  #endif
+
   CC2530_CSP_ISTXON();
 
   counter = 0;
@@ -302,6 +314,11 @@ transmit(unsigned short transmit_len)
     while(FSMSTAT1 & FSMSTAT1_TX_ACTIVE);
     ret = RADIO_TX_OK;
   }
+
+  #ifdef RFX2401C_ON
+  P1 &= ~0x04; //set rfx2401c TXEN OFF
+  P1 |= 0x08; //set rfx2401c RXEN (CE)
+  #endif
   ENERGEST_OFF(ENERGEST_TYPE_TRANSMIT);
   ENERGEST_ON(ENERGEST_TYPE_LISTEN);
 
@@ -318,7 +335,7 @@ transmit(unsigned short transmit_len)
 }
 /*---------------------------------------------------------------------------*/
 static int
-send(void *payload, unsigned short payload_len)
+send(const void *payload, unsigned short payload_len)
 {
   prepare(payload, payload_len);
   return transmit(payload_len);

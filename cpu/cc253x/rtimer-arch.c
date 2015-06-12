@@ -101,8 +101,13 @@ rtimer_arch_schedule(rtimer_clock_t t)
 #if CC_CONF_OPTIMIZE_STACK_SIZE
 #pragma exclude bits
 #endif
+#ifdef IAR_FOR_2530
+  #pragma vector=T1_VECTOR
+  __near_func __interrupt void rtimer_isr(void)
+#else
 void
 rtimer_isr(void) __interrupt(T1_VECTOR)
+#endif
 {
   T1IE = 0; /* Ignore Timer 1 Interrupts */
   ENERGEST_ON(ENERGEST_TYPE_IRQ);

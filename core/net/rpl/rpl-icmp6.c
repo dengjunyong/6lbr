@@ -55,7 +55,8 @@
 #include <limits.h>
 #include <string.h>
 
-#define DEBUG DEBUG_NONE
+//#define DEBUG DEBUG_NONE
+#define DEBUG DEBUG_FLAG
 
 #include "net/ip/uip-debug.h"
 
@@ -748,7 +749,9 @@ dao_input(void)
                               (uip_lladdr_t *)packetbuf_addr(PACKETBUF_ADDR_SENDER),
                               0, NBR_REACHABLE)) != NULL) {
       /* set reachable timer */
-      stimer_set(&nbr->reachable, UIP_ND6_REACHABLE_TIME / 1000);
+      //stimer_set(&nbr->reachable, UIP_ND6_REACHABLE_TIME / 1000);
+      uip_ds6_if.reachable_time = uip_ds6_compute_reachable_time();
+      stimer_set(&(nbr->reachable), uip_ds6_if.reachable_time / 1000);
       PRINTF("RPL: Neighbor added to neighbor cache ");
       PRINT6ADDR(&dao_sender_addr);
       PRINTF(", ");

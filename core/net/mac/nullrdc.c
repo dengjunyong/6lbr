@@ -51,6 +51,7 @@
 #endif /* CONTIKI_TARGET_COOJA */
 
 #define DEBUG 0
+//#define DEBUG DEBUG_FLAG
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
