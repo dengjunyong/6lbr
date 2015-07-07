@@ -226,6 +226,8 @@ uip_ds6_neighbor_periodic(void)
   while(nbr != NULL) {
     switch(nbr->state) {
     case NBR_REACHABLE:
+      /* 配置了白名单,不再到期,永久有效 */
+#if !RPL_WHITE_LIST
       if(stimer_expired(&nbr->reachable)) {
         PRINTF("REACHABLE: moving to STALE (");
         PRINT6ADDR(&nbr->ipaddr);
@@ -238,6 +240,7 @@ uip_ds6_neighbor_periodic(void)
           nbr->state = NBR_STALE;
         }
       }
+#endif
       break;
 #if UIP_ND6_SEND_NA
     case NBR_INCOMPLETE:

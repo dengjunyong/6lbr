@@ -85,6 +85,27 @@ void RPL_DEBUG_DIO_INPUT(uip_ipaddr_t *, rpl_dio_t *);
 void RPL_DEBUG_DAO_OUTPUT(rpl_parent_t *);
 #endif
 
+#if RPL_WHITE_LIST
+/* 保存DAO数据,等到接收DAO ACK需要使用 */
+uip_ipaddr_t g_prefix;
+uip_ipaddr_t g_dao_sender_addr;
+uint8_t g_prefixlen = 0;
+uint16_t g_sequence = 0;
+uint8_t g_instance_id;
+uint8_t g_lifetime;
+uip_ds6_nbr_t *g_nbr;
+
+/* 白名单按钮 */
+#if RPL_ROLE_ROUTER
+uint8_t white_list_button = 1; //1可加入, 路由暂时没有按钮, 暂时固定为1
+#else
+uint8_t white_list_button = 0; //1可加入
+#endif
+
+uint8_t dis_atomic = 0; //收到dis回复dio的原子操作
+struct ctimer dis_atomic_timer;
+#endif
+
 static uint8_t dao_sequence = RPL_LOLLIPOP_INIT;
 
 extern rpl_of_t RPL_OF;
@@ -147,11 +168,20 @@ set16(uint8_t *buffer, int pos, uint16_t value)
   buffer[pos++] = value & 0xff;
 }
 /*---------------------------------------------------------------------------*/
+#if RPL_WHITE_LIST && !RPL_LEAF_ONLY
+void handle_dis_atomic_timer(void *ptr)
+{
+    dis_atomic = 0;
+    return;
+}
+#endif
+/*---------------------------------------------------------------------------*/
 static void
 dis_input(void)
 {
   rpl_instance_t *instance;
   rpl_instance_t *end;
+  int pos = 0;
 
   /* DAG Information Solicitation */
   PRINTF("RPL: Received a DIS from ");
@@ -160,14 +190,56 @@ dis_input(void)
 
   for(instance = &instance_table[0], end = instance + RPL_MAX_INSTANCES;
       instance < end; ++instance) {
+#if RPL_WHITE_LIST
+    //uip_ds6_nbr_t *ds6_nbr = uip_ds6_nbr_lookup(&UIP_IP_BUF->srcipaddr);
+    //const uip_lladdr_t *lladdr = uip_ds6_nbr_get_ll(ds6_nbr);
+    //linkaddr_t packetbuf_addr(PACKETBUF_ADDR_SENDER)
+    /* 必须保证有父节点,其次在白名单中或者按钮被按下 */
+#if RPL_LEAF_ONLY
+    if(instance->used == 1 && instance->dao_ack == 1) {
+#else
+    pos = mac_in_white_list((const uip_lladdr_t *)packetbuf_addr(PACKETBUF_ADDR_SENDER));
+    if(instance->used == 1 && instance->dao_ack == 1 
+         && ((-1 != pos && mac_is_nbr(pos)) || 1 == white_list_button)) {
+#endif
+#else
     if(instance->used == 1) {
+#endif
 #if RPL_LEAF_ONLY
       if(!uip_is_addr_mcast(&UIP_IP_BUF->destipaddr)) {
 	PRINTF("RPL: LEAF ONLY Multicast DIS will NOT reset DIO timer\n");
 #else /* !RPL_LEAF_ONLY */
       if(uip_is_addr_mcast(&UIP_IP_BUF->destipaddr)) {
         PRINTF("RPL: Multicast DIS => reset DIO timer\n");
+#if RPL_WHITE_LIST
+        if (1 == dis_atomic)
+        {
+            PRINTF("Another dis recv within 2s \n");
+            continue;
+        }
+        dis_atomic = 1;
+        ctimer_set(&dis_atomic_timer, CLOCK_SECOND * 2, &handle_dis_atomic_timer, NULL);
+        if (1 == white_list_button) {
+            /* 按钮被按下,收到到dis包,加入nbr */
+            uip_ds6_nbr_t *nbr;
+            if((nbr = uip_ds6_nbr_lookup(&UIP_IP_BUF->srcipaddr)) == NULL) {
+                if((nbr = uip_ds6_nbr_add(&UIP_IP_BUF->srcipaddr, 
+                              (uip_lladdr_t *)packetbuf_addr(PACKETBUF_ADDR_SENDER),
+                              0, NBR_REACHABLE)) != NULL) {
+                  /* set reachable timer */
+                  stimer_set(&nbr->reachable, UIP_ND6_REACHABLE_TIME / 1000);
+                  PRINTF("RPL read conf: Neighbor added to neighbor cache ");
+                  PRINT6ADDR(&UIP_IP_BUF->srcipaddr);
+                  PRINTF(", ");
+                  PRINTLLADDR((uip_lladdr_t *)packetbuf_addr(PACKETBUF_ADDR_SENDER));
+                  PRINTF("\n");
+                }
+            }
+        }
+        dio_output(instance, &UIP_IP_BUF->srcipaddr);
+#else
         rpl_reset_dio_timer(instance);
+#endif
       } else {
 #endif /* !RPL_LEAF_ONLY */
         PRINTF("RPL: Unicast DIS, reply to sender\n");
@@ -240,9 +312,9 @@ dio_input(void)
   PRINTF("\n");
 
   if((nbr = uip_ds6_nbr_lookup(&from)) == NULL) {
-    if((nbr = uip_ds6_nbr_add(&from, (uip_lladdr_t *)
-                              packetbuf_addr(PACKETBUF_ADDR_SENDER),
-                              0, NBR_REACHABLE)) != NULL) {
+    if((nbr = uip_ds6_nbr_add(&from, 
+                (uip_lladdr_t *) packetbuf_addr(PACKETBUF_ADDR_SENDER),
+                0, NBR_REACHABLE)) != NULL) {
       /* set reachable timer */
       stimer_set(&nbr->reachable, UIP_ND6_REACHABLE_TIME / 1000);
       PRINTF("RPL: Neighbor added to neighbor cache ");
@@ -768,13 +840,72 @@ dao_input(void)
   } else {
     PRINTF("RPL: Neighbor already in neighbor cache\n");
   }
+#if RPL_WHITE_LIST && !RPL_LEAF_ONLY
+  uip_ds6_nbr_t *ds6_nbr = uip_ds6_nbr_lookup(&dao_sender_addr);
+  const uip_lladdr_t *lladdr = uip_ds6_nbr_get_ll(ds6_nbr);
+  int position = mac_in_white_list(lladdr);
+  if (0 == memcmp(&prefix.u8[8], &dao_sender_addr.u8[0], 8)
+          && 0 == white_list_button
+          && (-1 == position || !mac_is_nbr(position)))
+  {
+      //根节点和路由节点,DAO target是发送者,而且按钮没按下,且不在白名单或者在白名单中但不是邻居,抛弃
+      PRINTF("dao imme direct, button not set, ");
+      uip_len = 0;
+      return;
+  }
+#endif
 
+#if RPL_WHITE_LIST && RPL_ROLE_ROUTER
+  if (-1 == mac_in_white_list(lladdr)) {
+    //路由节点,且不在白名单中,上传DAO到上一级,暂时保存数据,连接跟踪
+    memcpy(&g_prefix, &prefix, sizeof(uip_ipaddr_t));
+    memcpy(&g_dao_sender_addr, &dao_sender_addr, sizeof(uip_ipaddr_t));
+    g_prefixlen = prefixlen;
+    g_sequence = sequence;
+    g_instance_id = instance_id;
+    g_lifetime = lifetime;
+    g_nbr = nbr;
+    goto fwd_dao;
+  }
+  else {
+    /* 在白名单中,直接回复dao ack */
+    goto dao_ack;
+  }
+#endif
+#if RPL_WHITE_LIST && CETIC_6LBR_DODAG_ROOT
+  /* 根节点,已经在白名单或者加入白名单失败,直接return */
+  if (0 == memcmp(&prefix.u8[8], &dao_sender_addr.u8[8], sizeof(uip_lladdr_t))) {
+      /* 邻居 */
+      if (-1 == mac_in_white_list(lladdr) 
+            && -1 == addto_white_list(lladdr, lladdr, 1, 0, 0, 0))
+      {
+        uip_len = 0;
+        return;
+      }
+  }
+  else {
+      /* 非邻居 */
+      uip_lladdr_t prefix_lladdr = {{0}};
+      memcpy(&prefix_lladdr, &prefix.u8[8], sizeof(uip_lladdr_t));
+      prefix_lladdr.addr[0] ^= 0x02;
+      if (-1 == mac_in_white_list(&prefix_lladdr) 
+            && -1 == addto_white_list(&prefix_lladdr, lladdr, 0, 0, 0, 0))
+      {
+        uip_len = 0;
+        return;
+      }
+  }
+  nbr_table_lock(ds6_neighbors, nbr);
+#endif
+  /* 根节点,加入白名单成功,加入路由 */
   rpl_lock_parent(parent);
 
+  /* prefix前缀是aaaa:: , dao_sender_addr前缀是fe80:: */
   rep = rpl_add_route(dag, &prefix, prefixlen, &dao_sender_addr);
   if(rep == NULL) {
     RPL_STAT(rpl_stats.mem_overflows++);
     PRINTF("RPL: Could not add a route after receiving a DAO\n");
+    uip_len = 0;
     return;
   }
 
@@ -782,7 +913,9 @@ dao_input(void)
   rep->state.learned_from = learned_from;
   rep->state.nopath_received = 0;
 
-#if RPL_CONF_MULTICAST
+  goto dao_ack;
+
+#if RPL_CONF_MULTICAST || RPL_WHITE_LIST
 fwd_dao:
 #endif
 
@@ -795,11 +928,24 @@ fwd_dao:
       uip_icmp6_send(rpl_get_parent_ipaddr(dag->preferred_parent),
                      ICMP6_RPL, RPL_CODE_DAO, buffer_length);
     }
+#if !RPL_WHITE_LIST
     if(flags & RPL_DAO_K_FLAG) {
       dao_ack_output(instance, &dao_sender_addr, sequence);
     }
+#endif
   }
   uip_len = 0;
+  return;
+
+#if RPL_WHITE_LIST
+/* 不会即转发给上级又发送dao ack,2选1 */
+dao_ack:
+#endif
+  if(flags & RPL_DAO_K_FLAG) {
+    dao_ack_output(instance, &dao_sender_addr, sequence);
+  }
+  uip_len = 0;
+  return;
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -910,12 +1056,16 @@ dao_output_target(rpl_parent_t *parent, uip_ipaddr_t *prefix, uint8_t lifetime)
 static void
 dao_ack_input(void)
 {
-#if DEBUG
+#if DEBUG || RPL_WHITE_LIST
   unsigned char *buffer;
   uint8_t buffer_length;
   uint8_t instance_id;
   uint8_t sequence;
   uint8_t status;
+  rpl_instance_t *instance;
+  uip_ds6_route_t *rep;
+  rpl_dag_t *dag;
+  int learned_from;
 
   buffer = UIP_ICMP_PAYLOAD;
   buffer_length = uip_len - uip_l3_icmp_hdr_len;
@@ -928,6 +1078,96 @@ dao_ack_input(void)
     sequence, status);
   PRINT6ADDR(&UIP_IP_BUF->srcipaddr);
   PRINTF("\n");
+  PRINTF("dao_sequence:%d, g_sequence:%d\n", dao_sequence, g_sequence);
+
+  if (sequence == dao_sequence && sequence != 0)
+  {
+    //自己主动发送dao返回的ack
+    int i,j;
+    dao_sequence = 0;
+    for(i = 0; i < RPL_MAX_INSTANCES; ++i) {
+      if(instance_table[i].used == 1 && instance_table[i].dao_ack == 0) {
+        instance_table[i].used = 1;
+        instance_table[i].dao_ack = 1;
+
+        for(j = 0; j < RPL_MAX_DAG_PER_INSTANCE; ++j) {
+          if(instance_table[i].dag_table[j].used == 1 && instance_table[i].dag_table[j].dao_ack == 0) {
+              instance_table[i].dag_table[j].used = 1;
+              instance_table[i].dag_table[j].dao_ack = 1;
+          }
+        }
+
+      }
+    }
+  }
+#if !RPL_LEAF_ONLY
+  else if (sequence == g_sequence && sequence != 0)
+  {
+    //转发的dao返回的ack
+    uip_ds6_nbr_t *ds6_nbr = uip_ds6_nbr_lookup(&g_dao_sender_addr);
+    const uip_lladdr_t *lladdr = uip_ds6_nbr_get_ll(ds6_nbr);
+    g_sequence = 0;
+    PRINTF("forward dao ack \n");
+    //前缀不一样, prefix前缀aaaa:: , dao_sender_addr前缀fe80:: , 只比较mac部分
+    if (0 == memcmp(&g_prefix.u8[8], &g_dao_sender_addr.u8[8], 8)) {
+        //邻居
+        PRINTF("forward dao ack , nexthop is nbr %p\n", &lladdr);
+        if (-1 == mac_in_white_list(lladdr) 
+              && -1 == addto_white_list(lladdr, lladdr, 1, 0, 0, 0))
+        {
+          PRINTF("add to white list fail\n");
+          uip_len = 0;
+          return;
+        }
+    }
+    else {
+        //非邻居
+        PRINTF("forward dao ack , nexthop is not nbr %p\n", &lladdr);
+        uip_lladdr_t prefix_lladdr = {{0}};
+        memcpy(&prefix_lladdr, &g_prefix.u8[8], sizeof(uip_lladdr_t));
+        g_prefix.u8[8] ^= 0x02;
+        if (-1 == mac_in_white_list(lladdr) 
+              && -1 == addto_white_list(&prefix_lladdr, lladdr, 0, 0, 0, 0))
+        {
+          PRINTF("add to white list fail\n");
+          uip_len = 0;
+          return;
+        }
+    }
+    instance = rpl_get_instance(g_instance_id);
+    dag = instance->current_dag;
+    rep = rpl_add_route(dag, &g_prefix, g_prefixlen, &g_dao_sender_addr);
+    if(rep == NULL) {
+      RPL_STAT(rpl_stats.mem_overflows++);
+      PRINTF("RPL: Could not add a route after receiving a DAO\n");
+      uip_len = 0;
+      return;
+    }
+
+    nbr_table_lock(ds6_neighbors, g_nbr);
+    learned_from = uip_is_addr_mcast(&g_dao_sender_addr) ?
+                 RPL_ROUTE_FROM_MULTICAST_DAO : RPL_ROUTE_FROM_UNICAST_DAO;
+
+    rep->state.lifetime = RPL_LIFETIME(instance, g_lifetime);
+    rep->state.learned_from = learned_from;
+    rep->state.nopath_received = 0;
+
+    PRINTF("RPL: Forwarding DAO ACK to nexthop\n");
+    //转发给下一级
+    //if(learned_from == RPL_ROUTE_FROM_UNICAST_DAO) {
+      if(dag->preferred_parent != NULL &&
+         rpl_get_parent_ipaddr(dag->preferred_parent) != NULL) {
+        PRINTF("RPL: Forwarding DAO ACK to ");
+        PRINT6ADDR(&g_dao_sender_addr);
+        PRINTF("\n");
+        uip_icmp6_send(&g_dao_sender_addr,
+                       ICMP6_RPL, RPL_CODE_DAO_ACK, buffer_length);
+      }
+    //}
+    uip_len = 0;
+  }
+#endif
+
 #endif /* DEBUG */
   uip_len = 0;
 }
@@ -936,6 +1176,16 @@ void
 dao_ack_output(rpl_instance_t *instance, uip_ipaddr_t *dest, uint8_t sequence)
 {
   unsigned char *buffer;
+
+#if RPL_WHITE_LIST && !RPL_LEAF_ONLY
+  uip_ds6_nbr_t *ds6_nbr = uip_ds6_nbr_lookup(dest);
+  const uip_lladdr_t *lladdr = uip_ds6_nbr_get_ll(ds6_nbr);
+  if (-1 == mac_in_white_list(lladdr))
+  {
+      //不在白名单,不回复dao ack
+      return;
+  }
+#endif
 
   PRINTF("RPL: Sending a DAO ACK with sequence number %d to ", sequence);
   PRINT6ADDR(dest);

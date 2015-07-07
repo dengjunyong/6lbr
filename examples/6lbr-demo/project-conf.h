@@ -106,6 +106,16 @@
 #undef UART1_CONF_WITH_INPUT
 #define UART1_CONF_WITH_INPUT 0
 
+#define RPL_WHITE_LIST 1 /* RPL白名单机制使能 */
+#if RPL_WHITE_LIST
+#undef RPL_CONF_DAO_ACK
+#define RPL_CONF_DAO_ACK 1 /* RPL白名单机制, 需要配置dao ack */
+#endif
+
+#define RPL_ROLE_LEAF 1 /* RPL叶子节点 */
+
+#define  RPL_DIS_INTERVAL_CONF 30 /* dis发送间隔,单位秒 */
+
 /*---------------------------------------------------------------------------*/
 /* Radio                                                                     */
 /*---------------------------------------------------------------------------*/

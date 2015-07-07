@@ -240,7 +240,11 @@ get_dag(uint8_t instance_id, uip_ipaddr_t *dag_id)
 
   for(i = 0; i < RPL_MAX_DAG_PER_INSTANCE; ++i) {
     dag = &instance->dag_table[i];
+#if RPL_WHITE_LIST
+    if(dag->used && dag->dao_ack && uip_ipaddr_cmp(&dag->dag_id, dag_id)) {
+#else
     if(dag->used && uip_ipaddr_cmp(&dag->dag_id, dag_id)) {
+#endif
       return dag;
     }
   }
@@ -297,6 +301,11 @@ rpl_set_root(uint8_t instance_id, uip_ipaddr_t *dag_id)
 
   instance = dag->instance;
 
+#if RPL_WHITE_LIST
+  instance->dao_ack = 1;
+  dag->dao_ack = 1;
+#endif
+
   dag->version = version;
   dag->joined = 1;
   dag->grounded = RPL_GROUNDED;
@@ -340,6 +349,9 @@ rpl_set_root(uint8_t instance_id, uip_ipaddr_t *dag_id)
   ANNOTATE("#A root=%u\n", dag->dag_id.u8[sizeof(dag->dag_id) - 1]);
 
   rpl_reset_dio_timer(instance);
+
+  //根节点,增加instance完成后,读取配置文件,配置相关配置
+  read_white_list_conf(instance_id);
 
   return dag;
 }
@@ -484,11 +496,18 @@ rpl_alloc_instance(uint8_t instance_id)
 
   for(instance = &instance_table[0], end = instance + RPL_MAX_INSTANCES;
       instance < end; ++instance) {
+#if RPL_WHITE_LIST
+    if(instance->used == 0 || instance->dao_ack == 0) {
+#else
     if(instance->used == 0) {
+#endif
       memset(instance, 0, sizeof(*instance));
       instance->instance_id = instance_id;
       instance->def_route = NULL;
       instance->used = 1;
+#if RPL_WHITE_LIST
+      instance->dao_ack = 0;
+#endif
       return instance;
     }
   }
@@ -511,9 +530,16 @@ rpl_alloc_dag(uint8_t instance_id, uip_ipaddr_t *dag_id)
   }
 
   for(dag = &instance->dag_table[0], end = dag + RPL_MAX_DAG_PER_INSTANCE; dag < end; ++dag) {
+#if RPL_WHITE_LIST
+    if(!dag->used || 0 == dag->dao_ack) {
+#else
     if(!dag->used) {
+#endif
       memset(dag, 0, sizeof(*dag));
       dag->used = 1;
+#if RPL_WHITE_LIST
+      dag->dao_ack = 0;
+#endif
       dag->rank = INFINITE_RANK;
       dag->min_rank = INFINITE_RANK;
       dag->instance = instance;
@@ -551,12 +577,16 @@ rpl_free_instance(rpl_instance_t *instance)
 
   ctimer_stop(&instance->dio_timer);
   ctimer_stop(&instance->dao_timer);
+  ctimer_stop(&instance->dao_lifetime_timer); //缺少会导致etimer链表闭环
 
   if(default_instance == instance) {
     default_instance = NULL;
   }
 
   instance->used = 0;
+#if RPL_WHITE_LIST
+  instance->dao_ack = 0;
+#endif
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -579,6 +609,9 @@ rpl_free_dag(rpl_dag_t *dag)
     remove_parents(dag, 0);
   }
   dag->used = 0;
+#if RPL_WHITE_LIST
+  dag->dao_ack = 0;
+#endif
 }
 /*---------------------------------------------------------------------------*/
 rpl_parent_t *
@@ -851,12 +884,31 @@ rpl_get_any_dag(void)
   int i;
 
   for(i = 0; i < RPL_MAX_INSTANCES; ++i) {
+#if RPL_WHITE_LIST
+    if(instance_table[i].used && instance_table[i].dao_ack && instance_table[i].current_dag->joined) {
+#else
     if(instance_table[i].used && instance_table[i].current_dag->joined) {
+#endif
       return instance_table[i].current_dag;
     }
   }
   return NULL;
 }
+/*---------------------------------------------------------------------------*/
+#if RPL_WHITE_LIST
+rpl_instance_t *
+rpl_free_instance_nodaoack()
+{
+  int i;
+
+  for(i = 0; i < RPL_MAX_INSTANCES; ++i) {
+    if(instance_table[i].used == 1 && instance_table[i].dao_ack == 0) {
+        rpl_free_instance(&instance_table[i]);
+    }
+  }
+  return NULL;
+}
+#endif
 /*---------------------------------------------------------------------------*/
 rpl_instance_t *
 rpl_get_instance(uint8_t instance_id)
@@ -864,7 +916,11 @@ rpl_get_instance(uint8_t instance_id)
   int i;
 
   for(i = 0; i < RPL_MAX_INSTANCES; ++i) {
+#if RPL_WHITE_LIST
+    if(instance_table[i].used && instance_table[i].dao_ack && instance_table[i].instance_id == instance_id) {
+#else
     if(instance_table[i].used && instance_table[i].instance_id == instance_id) {
+#endif
       return &instance_table[i];
     }
   }
@@ -1239,6 +1295,10 @@ rpl_process_dio(uip_ipaddr_t *from, rpl_dio_t *dio)
     return;
   }
 
+#if RPL_WHITE_LIST
+  rpl_free_instance_nodaoack();
+#endif
+
   dag = get_dag(dio->instance_id, &dio->dag_id);
   instance = rpl_get_instance(dio->instance_id);
 
@@ -1380,7 +1440,10 @@ rpl_process_dio(uip_ipaddr_t *from, rpl_dio_t *dio)
   if(dag->joined && p == dag->preferred_parent) {
     if(should_send_dao(instance, dio, p)) {
       RPL_LOLLIPOP_INCREMENT(instance->dtsn_out);
+#if !RPL_WHITE_LIST
+      //已经有父节点,不再发送DAO
       rpl_schedule_dao(instance);
+#endif
     }
     /* We received a new DIO from our preferred parent.
      * Call uip_ds6_defrt_add to set a fresh value for the lifetime counter */

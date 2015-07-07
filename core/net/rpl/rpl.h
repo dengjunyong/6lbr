@@ -45,6 +45,45 @@
 #include "net/ipv6/uip-ds6.h"
 #include "sys/ctimer.h"
 
+#if RPL_WHITE_LIST && !RPL_LEAF_ONLY
+enum role_device{
+    role_gateway,
+    role_router,
+    role_leaf
+};
+enum type_device{
+    type_light,
+    type_switch
+};
+
+struct white_device{
+    uint8_t used:1; //是否使用, 1使用
+    uint8_t isnbr:1; //是否直连,是否邻居, 1邻居
+    uint8_t role:1; //是否路由,是路由还是叶子, 1路由
+    uint8_t reserved_1:5;
+    uint8_t type:6; //设备类型
+    uint8_t ver:2; //设备版本
+    uint8_t nexthop_pos; //下一跳编号,nbr == 1 说明直连 则该字段无效
+    uint8_t reserved_2; //保留
+    uip_lladdr_t lladdr; //mac地址
+};//12Byte
+
+int mac_is_eq(const uip_lladdr_t *lladdr1, const uip_lladdr_t *lladdr2);
+
+int mac_is_null(const uip_lladdr_t *lladdr);
+
+int mac_is_nbr(int pos);
+
+int mac_in_white_list(const uip_lladdr_t *lladdr);
+
+int addto_white_list(const uip_lladdr_t *target, const uip_lladdr_t *nexthop,
+           uint8_t isnbr, uint8_t role, uint8_t type, uint8_t ver);
+
+//int write_white_list_conf();
+
+void read_white_list_conf(uint8_t instance_id);
+#endif
+
 /*---------------------------------------------------------------------------*/
 typedef uint16_t rpl_rank_t;
 typedef uint16_t rpl_ocp_t;
@@ -144,6 +183,9 @@ struct rpl_dag {
   struct rpl_instance *instance;
   rpl_prefix_t prefix_info;
   uint32_t lifetime;
+#if RPL_WHITE_LIST
+  uint8_t dao_ack;
+#endif
 };
 typedef struct rpl_dag rpl_dag_t;
 typedef struct rpl_instance rpl_instance_t;
@@ -229,6 +271,9 @@ struct rpl_instance {
   struct ctimer dio_timer;
   struct ctimer dao_timer;
   struct ctimer dao_lifetime_timer;
+#if RPL_WHITE_LIST
+  uint8_t dao_ack;
+#endif
 };
 
 /*---------------------------------------------------------------------------*/

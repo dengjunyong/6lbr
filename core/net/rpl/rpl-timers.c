@@ -63,6 +63,10 @@ static uint16_t next_dis;
 /* dio_send_ok is true if the node is ready to send DIOs */
 static uint8_t dio_send_ok;
 
+#if RPL_WHITE_LIST
+extern uint8_t white_list_button;
+#endif
+
 /*---------------------------------------------------------------------------*/
 static void
 handle_periodic_timer(void *ptr)
@@ -75,7 +79,13 @@ handle_periodic_timer(void *ptr)
 #if RPL_DIS_SEND
   next_dis++;
   if(rpl_get_any_dag() == NULL && next_dis >= RPL_DIS_INTERVAL) {
+#if RPL_WHITE_LIST
+    /* 更随机 5~30s */
+    next_dis = RPL_DIS_START_DELAY +
+      ((uint32_t)(RPL_DIS_INTERVAL - RPL_DIS_START_DELAY) * (uint32_t)random_rand()) / RANDOM_RAND_MAX;
+#else
     next_dis = 0;
+#endif
     dis_output(NULL);
   }
 #endif
@@ -151,7 +161,15 @@ handle_dio_timer(void *ptr)
 #if RPL_CONF_STATS
       instance->dio_totsend++;
 #endif /* RPL_CONF_STATS */
+#if RPL_WHITE_LIST
+      /* 不再广播dio,只在接收到dis后回复单播dio */
+      //if (1 == instance->dao_ack && 1 == white_list_button) //按钮被按下,且有父节点
+      //{
+      //  dio_output(instance, NULL); //dio_output()函数内部判断如果是叶子节点就不会发送DIO
+      //}
+#else
       dio_output(instance, NULL);
+#endif
     } else {
       PRINTF("RPL: Supressing DIO transmission (%d >= %d)\n",
              instance->dio_counter, instance->dio_redundancy);
@@ -173,9 +191,14 @@ handle_dio_timer(void *ptr)
 void
 rpl_reset_periodic_timer(void)
 {
+#if RPL_WHITE_LIST
+  next_dis = RPL_DIS_START_DELAY +
+    ((uint32_t)(RPL_DIS_INTERVAL - RPL_DIS_START_DELAY) * (uint32_t)random_rand()) / RANDOM_RAND_MAX;
+#else
   next_dis = RPL_DIS_INTERVAL / 2 +
     ((uint32_t)RPL_DIS_INTERVAL * (uint32_t)random_rand()) / RANDOM_RAND_MAX -
     RPL_DIS_START_DELAY;
+#endif
   ctimer_set(&periodic_timer, CLOCK_SECOND, handle_periodic_timer, NULL);
 }
 /*---------------------------------------------------------------------------*/
@@ -299,9 +322,13 @@ schedule_dao(rpl_instance_t *instance, clock_time_t latency)
     PRINTF("RPL: DAO timer already scheduled\n");
   } else {
     if(latency != 0) {
+#if RPL_WHITE_LIST
+      expiration_time = 2; //由于不再广播dio,所以立即回复dao
+#else
       //expiration_time = latency / 2 +
       expiration_time = 2 + // between 2 to 2+latecy
         (random_rand() % (latency));
+#endif
     } else {
       expiration_time = 0;
     }

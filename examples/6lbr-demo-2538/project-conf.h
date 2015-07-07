@@ -84,7 +84,7 @@
  */
 #define NETSTACK_CONF_RDC_CHANNEL_CHECK_RATE 8
 
-#define DEBUG_FLAG 0 /* debug flag */
+#define DEBUG_FLAG 1 /* debug flag */
 #define STARTUP_CONF_VERBOSE 1
 
 #undef RF_CHANNEL
@@ -105,6 +105,16 @@
 #define UART1_CONF_ENABLE 0
 #undef UART1_CONF_WITH_INPUT
 #define UART1_CONF_WITH_INPUT 0
+
+#define RPL_WHITE_LIST 1 /* RPL白名单机制使能 */
+#if RPL_WHITE_LIST
+#undef RPL_CONF_DAO_ACK
+#define RPL_CONF_DAO_ACK 1 /* RPL白名单机制, 需要配置dao ack */
+#endif
+
+#define RPL_ROLE_ROUTER 1 /* RPL路由节点 */
+
+#define  RPL_DIS_INTERVAL_CONF 30 /* dis发送间隔,单位秒 */
 
 /*---------------------------------------------------------------------------*/
 /* Radio                                                                     */

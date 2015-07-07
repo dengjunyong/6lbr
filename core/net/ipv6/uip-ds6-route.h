@@ -110,7 +110,7 @@ typedef struct uip_ds6_route {
   struct uip_ds6_route_neighbor_routes *neighbor_routes;
   uip_ipaddr_t ipaddr;
 #ifdef UIP_DS6_ROUTE_STATE_TYPE
-  UIP_DS6_ROUTE_STATE_TYPE state;
+  UIP_DS6_ROUTE_STATE_TYPE state; //代码中未用到
 #endif
   uint8_t length;
 } uip_ds6_route_t;

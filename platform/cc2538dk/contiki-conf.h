@@ -435,7 +435,9 @@ typedef uint32_t rtimer_clock_t;
 #endif
 #define UIP_CONF_UDP                         1
 #define UIP_CONF_UDP_CHECKSUMS               1
+#ifndef UIP_CONF_ICMP6
 #define UIP_CONF_ICMP6                       1
+#endif
 
 /* ND and Routing */
 #ifndef UIP_CONF_ROUTER

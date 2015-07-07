@@ -192,20 +192,20 @@ bin/cetic_6lbr_rpl_root:
 all_native:
 	rm -rf bin
 	mkdir -p bin
-	$(MAKE) TARGET=native clean
-	$(MAKE) TARGET=native bin/cetic_6lbr_smart_bridge 
-	$(MAKE) TARGET=native clean
-	$(MAKE) TARGET=native bin/cetic_6lbr_rpl_relay
-	$(MAKE) TARGET=native clean
-	$(MAKE) TARGET=native bin/cetic_6lbr_full_transparent_bridge 
+#	$(MAKE) TARGET=native clean
+#	$(MAKE) TARGET=native bin/cetic_6lbr_smart_bridge 
+#	$(MAKE) TARGET=native clean
+#	$(MAKE) TARGET=native bin/cetic_6lbr_rpl_relay
+#	$(MAKE) TARGET=native clean
+#	$(MAKE) TARGET=native bin/cetic_6lbr_full_transparent_bridge 
 	$(MAKE) TARGET=native clean
 	$(MAKE) TARGET=native bin/cetic_6lbr_router 
-	$(MAKE) TARGET=native clean
-	$(MAKE) TARGET=native bin/cetic_6lbr_ndp_router 
-	$(MAKE) TARGET=native clean
-	$(MAKE) TARGET=native bin/cetic_6lbr_6lr
-	$(MAKE) TARGET=native clean
-	$(MAKE) TARGET=native bin/cetic_6lbr_rpl_root
+#	$(MAKE) TARGET=native clean
+#	$(MAKE) TARGET=native bin/cetic_6lbr_ndp_router 
+#	$(MAKE) TARGET=native clean
+#	$(MAKE) TARGET=native bin/cetic_6lbr_6lr
+#	$(MAKE) TARGET=native clean
+#	$(MAKE) TARGET=native bin/cetic_6lbr_rpl_root
 
 bin_econotag/cetic_6lbr_smart_bridge:
 	$(MAKE) TARGET=econotag CETIC_6LBR_SMARTBRIDGE=1 $(ECONOTAG_CONF)
@@ -402,7 +402,7 @@ PLUGIN_LDFLAGS=-dynamiclib -Wl,-undefined,dynamic_lookup
 else
 PLUGIN_LDFLAGS=-shared
 CFLAGS+=-fPIC
-TARGET_LIBFILES+=-ldl
+TARGET_LIBFILES+=-ldl -lpthread
 endif
 
 $(OBJECTDIR)/%.so: $(OBJECTDIR)/%.o

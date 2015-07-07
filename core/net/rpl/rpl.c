@@ -53,6 +53,352 @@
 #include <limits.h>
 #include <string.h>
 
+#if CETIC_6LBR_DODAG_ROOT
+#include <unistd.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <sys/stat.h>
+#define WHITE_LIST_FILENAME "/etc/rpl_white_list"
+#endif
+
+#if RPL_WHITE_LIST && !RPL_LEAF_ONLY
+//unsigned int white_list_count;
+struct white_device white_list[UIP_CONF_MAX_ROUTES]; //和路由个数相同
+
+extern uint8_t white_list_button;
+
+//相等返回1
+int mac_is_eq(const uip_lladdr_t *lladdr1, const uip_lladdr_t *lladdr2)
+{
+    int j = 0;
+    int eq = 1;
+    if (!lladdr1 || !lladdr2)
+    {
+        return 0;
+    }
+    for (j = 0; j < 8; j++)
+    {
+        if (lladdr1->addr[j] != lladdr2->addr[j])
+        {
+            eq = 0;
+            break;
+        }
+    }
+    return eq;
+}
+
+//为空返回1
+int mac_is_null(const uip_lladdr_t *lladdr)
+{
+    if (!lladdr)
+    {
+        return 1;
+    }
+    uip_lladdr_t null_addr;
+    memset(&null_addr, 0, 8);
+    return mac_is_eq(lladdr, &null_addr);
+}
+
+//是邻居,返回1
+int mac_is_nbr(int pos)
+{
+    if (pos >= UIP_CONF_MAX_ROUTES || pos < 0)
+    {
+        return 0;
+    }
+    if (0 == white_list[pos].used)
+    {
+        return 0;
+    }
+    return white_list[pos].isnbr;
+}
+
+//在白名单返回位置,否则返回-1
+int mac_in_white_list(const uip_lladdr_t *lladdr)
+{
+  int i = 0;
+  if (!lladdr)
+  {
+      return -1;
+  }
+  if (mac_is_null(lladdr))
+  {
+      return -1;
+  }
+  for (i = 0; i < UIP_CONF_MAX_ROUTES; i++)
+  {
+      if (!white_list[i].used)
+      {
+          break;
+      }
+      if (mac_is_eq(lladdr, &white_list[i].lladdr))
+      {
+          return i;
+      }
+  }
+  return -1;
+}
+
+//增加成功返回位置,否则返回-1
+int addto_white_list(const uip_lladdr_t *target, const uip_lladdr_t *nexthop,
+           uint8_t isnbr, uint8_t role, uint8_t type, uint8_t ver)
+{
+    int i = 0;
+    int ret = -1;
+    int pos = 0;
+    if (!target || !nexthop || mac_is_null(target)|| mac_is_null(nexthop))
+    {
+        return ret;
+    }
+
+    if (0 == isnbr) {
+        //目标不是下一跳
+        pos = mac_in_white_list(nexthop);
+        if (pos == -1) {
+            //下一跳不在白名单,异常
+            return ret;
+        }
+    }
+
+    if (-1 == mac_in_white_list(target)) {
+        //不在白名单,添加
+        for(; i < UIP_CONF_MAX_ROUTES; i++) {
+            if (0 == white_list[i].used)
+            {
+                white_list[i].used = 1;
+                white_list[i].role = role;
+                white_list[i].type = type;
+                white_list[i].ver = ver;
+                white_list[i].isnbr = isnbr;
+                white_list[i].nexthop_pos = pos;
+                memcpy(&white_list[i].lladdr, target, sizeof(uip_lladdr_t));
+                ret = i;
+                write_white_list_conf();
+                break;
+            }
+        }
+    }
+    return ret;
+}
+
+#if CETIC_6LBR_DODAG_ROOT
+int write_white_list_conf()
+{
+    int fd = 0;
+    fd = open(WHITE_LIST_FILENAME, O_RDWR | O_TRUNC);
+    if (fd <= 0) {
+        return -1;
+    }
+    int ret = write(fd, white_list, sizeof(white_list));
+    close(fd);
+    return ret;
+}
+
+void read_white_list_conf(uint8_t instance_id)
+{
+    int fd = 0;
+    int i = 0;
+    uip_ipaddr_t nexthop = {{0}};
+    uip_ipaddr_t target = {{0}};
+    uip_ds6_route_t *rep = NULL;
+    uip_ds6_nbr_t *nbr = NULL;
+    int learned_from = RPL_ROUTE_FROM_UNICAST_DAO;
+    struct rpl_instance *instance = NULL;
+    struct rpl_dag *dag = NULL;
+    uint8_t lifetime = 0;
+
+    if (0 != access(WHITE_LIST_FILENAME, F_OK)) {
+        //配置文件不存在,创建
+        memset(white_list, 0, sizeof(white_list));
+        fd = open(WHITE_LIST_FILENAME, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IWOTH | S_IROTH);
+        if (fd <= 0)
+        {
+            return;
+        }
+        write(fd, white_list, sizeof(white_list));
+        close(fd);
+        return;
+    }
+
+    fd = open(WHITE_LIST_FILENAME, O_RDWR);
+    if (fd <= 0) {
+        return;
+    }
+    int readret = read(fd, white_list, sizeof(white_list));
+    close(fd);
+    if (readret != sizeof(white_list)) {
+        PRINTF("RPL read conf : whilt list length error\n");
+        return;
+    }
+
+    instance = rpl_get_instance(instance_id);
+    if(instance == NULL) {
+      PRINTF("RPL: Ignoring a DAO for an unknown RPL instance(%u)\n",
+             instance_id);
+      return;
+    }
+    lifetime = instance->default_lifetime;
+    dag = instance->current_dag;
+
+    for(i = 0; i < UIP_CONF_MAX_ROUTES; i++) {
+        if (0 == white_list[i].used) {
+            continue;
+        }
+        if (1 == white_list[i].isnbr) {
+            /* 增加邻居节点, nbr的ip前缀是fe80:: */
+            uip_ip6addr(&target, 0xfe80, 0, 0, 0, 0, 0, 0, 0);
+            uip_ds6_set_addr_iid(&target, &white_list[i].lladdr);
+            if((nbr = uip_ds6_nbr_lookup(&target)) == NULL) {
+              if((nbr = uip_ds6_nbr_add(&target, &white_list[i].lladdr,
+                                        0, NBR_REACHABLE)) != NULL) {
+                /* set reachable timer */
+                stimer_set(&nbr->reachable, UIP_ND6_REACHABLE_TIME / 1000);
+                /* lock,永久有效 */
+                nbr_table_lock(ds6_neighbors, nbr);
+                PRINTF("RPL read conf: Neighbor added to neighbor cache ");
+                PRINT6ADDR(&target);
+                PRINTF(", ");
+                PRINTLLADDR(white_list[i].lladdr);
+                PRINTF("\n");
+              }
+            } else {
+              PRINTF("RPL read conf: Neighbor already in neighbor cache\n");
+            }
+        }
+        //模拟DAO, target(prefix)前缀是aaaa::
+        uip_ip6addr(&target, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
+        uip_ds6_set_addr_iid(&target, &white_list[i].lladdr);
+        if (1 == white_list[i].isnbr) {
+            //邻居, 模拟DAO, nexthop(dao_sender_addr)前缀是fe80::
+            uip_ip6addr(&nexthop, 0xfe80, 0, 0, 0, 0, 0, 0, 0);
+            uip_ds6_set_addr_iid(&nexthop, &white_list[i].lladdr);
+        }
+        else {
+            //非邻居
+            if (white_list[i].nexthop_pos >= UIP_CONF_MAX_ROUTES)
+            {
+                //邻居编号不正确
+                white_list[i].used = 0;
+                continue;
+            }
+            if (0 == white_list[white_list[i].nexthop_pos].used) {
+                //邻居编号对应的数据不可用
+                white_list[i].used = 0;
+                PRINTF("RPL read conf: data error!!!\n");
+                continue;
+            }
+            uip_ip6addr(&nexthop, 0xfe80, 0, 0, 0, 0, 0, 0, 0);
+            uip_ds6_set_addr_iid(&nexthop, &white_list[white_list[i].nexthop_pos].lladdr);
+            if((nbr = uip_ds6_nbr_lookup(&nexthop)) == NULL) {
+                if((nbr = uip_ds6_nbr_add(&nexthop, &white_list[white_list[i].nexthop_pos].lladdr,
+                                          0, NBR_REACHABLE)) != NULL) {
+                  /* set reachable timer */
+                  stimer_set(&nbr->reachable, UIP_ND6_REACHABLE_TIME / 1000);
+                  nbr_table_lock(ds6_neighbors, nbr);
+                  PRINTF("RPL read conf: Neighbor added to neighbor cache ");
+                  PRINT6ADDR(&target);
+                  PRINTF(", ");
+                  PRINTLLADDR(white_list[i].lladdr);
+                  PRINTF("\n");
+                }
+            }
+        }
+
+        /* target前缀是aaaa::(dao_input()对应prefix) , nexthop前缀是fe80::(dao_input()对应dao_sender_addr)
+         * 注意第三个参数,是位个数,而不是字节个数 */
+        rep = rpl_add_route(dag, &target, sizeof(uip_ipaddr_t) * CHAR_BIT, &nexthop);
+        if(rep == NULL) {
+          RPL_STAT(rpl_stats.mem_overflows++);
+          PRINTF("RPL: Could not add a route after receiving a DAO\n");
+          uip_len = 0;
+          return;
+        }
+
+        rep->state.lifetime = RPL_LIFETIME(instance, lifetime);
+        rep->state.learned_from = learned_from;
+        rep->state.nopath_received = 0;
+    }
+    return;
+}
+
+void *pthread_listen_white_list_button(void * arg)
+{
+    const char *fifo_name = "/tmp/rpl_white_list_fifo";
+    int pipe_fd = -1;
+    char buffer[10] = {0};
+    int res = 0;
+
+    pthread_detach(pthread_self());
+
+    if(access(fifo_name, F_OK) == -1)
+    {
+        //管道文件不存在, 创建命名管道
+        res = mkfifo(fifo_name, 777);
+        if(res != 0)
+        {
+            perror("mkfifo");
+            return NULL;
+        }
+    }
+
+    while (1) {
+        //open阻塞,直到另外一个进程O_WRONLY方式open才能退出阻塞
+        pipe_fd = open(fifo_name, O_RDONLY);
+        if(pipe_fd == -1) {
+            perror("open");
+            sleep(1);
+            continue;
+        }
+        memset(buffer, 0, sizeof(buffer));
+        res = read(pipe_fd, buffer, 5); //read默认阻塞
+        if (res <= 0) {
+            printf("read :%d\n", res);
+            sleep(1);
+            continue;
+        }
+        if (buffer[0] == '1') {
+            white_list_button = 1;
+            printf("white_list_button 1\n");
+        }
+        else if (buffer[0] == '0') {
+            white_list_button = 0;
+            printf("white_list_button 0\n");
+        }
+        close(pipe_fd);
+        sleep(1);
+    }
+    return NULL;
+}
+
+void listen_white_list_button()
+{
+    pthread_t pthread_id;
+    int ret = 0;
+    ret = pthread_create(&pthread_id, NULL, pthread_listen_white_list_button, NULL);
+    if(ret != 0){
+        PRINTF("Create pthread listen button error!n");
+    }
+    return;
+}
+#else /* CETIC_6LBR_DODAG_ROOT */
+int write_white_list_conf()
+{
+    return 0;
+}
+
+void read_white_list_conf(uint8_t instance_id)
+{
+    return;
+}
+void listen_white_list_button()
+{
+    return;
+}
+#endif /* CETIC_6LBR_DODAG_ROOT */
+
+#endif /* RPL_WHITE_LIST && !RPL_LEAF_ONLY */
+
+
 #if CETIC_6LBR_SMARTBRIDGE
 extern void
 send_purge_na(uip_ipaddr_t *prefix);
@@ -355,6 +701,10 @@ rpl_init(void)
 #endif
 
   RPL_OF.reset(NULL);
+#if RPL_WHITE_LIST && !RPL_LEAF_ONLY
+  //监听按钮
+  listen_white_list_button();
+#endif
 }
 /*---------------------------------------------------------------------------*/
 #endif /* UIP_CONF_IPV6 */
